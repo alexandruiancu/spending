@@ -1,0 +1,2 @@
+in_dir=../in_dir
+history_dir=../history
