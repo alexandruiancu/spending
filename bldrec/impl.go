@@ -2,12 +2,18 @@ package bldrec
 
 import (
 	"bufio"
+	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"regexp"
 	"spending/common"
 	"strings"
 	"sync"
+	"time"
+
+	capnp "capnproto.org/go/capnp/v3"
+	zmq "github.com/pebbe/zmq4"
 )
 
 func Process() error {
@@ -21,15 +27,27 @@ func Process() error {
 		return err
 	}
 
+	port := config["frontend_port"]
 	for _, record := range records {
-		println(strings.Join(record, " | "))
+		socket, _ := zmq.NewSocket(zmq.REQ)
+		defer socket.Close()
+		socket.Connect(fmt.Sprintf("tcp://localhost:%s", port))
+		// Serialize to a byte slice
+		data, err := record.Message().Marshal()
+		if err != nil {
+			log.Fatalf("marshal: %v", err)
+		}
+		socket.SendBytes(data, 0)
+		// Receive reply
+		reply, _ := socket.Recv(0)
+		fmt.Printf("Received reply: %s\n", reply)
 	}
 
 	return nil
 }
 
-func ProcessFiles(inDir, historyDir string) ([][]string, error) {
-	var records [][]string
+func ProcessFiles(inDir, historyDir string) ([]Record, error) {
+	var records []Record
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 
@@ -72,9 +90,12 @@ func ProcessFiles(inDir, historyDir string) ([][]string, error) {
 			for _, aggregate := range aggregates {
 				if len(aggregate[0]) > 0 {
 					if len(record) > 0 {
-						mu.Lock()
-						records = append(records, record)
-						mu.Unlock()
+						rec, err := createRecord(record)
+						if err == nil {
+							mu.Lock()
+							records = append(records, rec)
+							mu.Unlock()
+						}
 						record = nil
 					}
 					record = aggregate
@@ -88,9 +109,12 @@ func ProcessFiles(inDir, historyDir string) ([][]string, error) {
 				}
 			}
 			if record != nil {
-				mu.Lock()
-				records = append(records, record)
-				mu.Unlock()
+				rec, err := createRecord(record)
+				if err == nil {
+					mu.Lock()
+					records = append(records, rec)
+					mu.Unlock()
+				}
 			}
 		}(filePath)
 	}
@@ -112,4 +136,41 @@ func readLines(filePath string) ([]string, error) {
 		lines = append(lines, scanner.Text())
 	}
 	return lines, scanner.Err()
+}
+
+func createRecord(fields []string) (Record, error) {
+	// Create a new message arena
+	arena := capnp.SingleSegment(nil)
+	_, seg, err := capnp.NewMessage(arena)
+	if err != nil {
+		panic(err)
+	}
+	// Create a new Record
+	rec, err := NewRootRecord(seg)
+	if err != nil {
+		return rec, err
+	}
+
+	// Set the fields from the string array
+	if len(fields) > 0 {
+		const layout = "02/01/2006"
+		// Parse fields[0] as a date and convert to Unix timestamp (Int64)
+		t, err := time.Parse(layout, fields[0])
+		if err != nil {
+			// Try alternative formats or fall back to current time
+			t = time.Now()
+		}
+		rec.SetUDateTime(t.Unix())
+	}
+	if len(fields) > 1 {
+		rec.SetSDescription(fields[1])
+	}
+	if len(fields) > 2 {
+		rec.SetFValue(0.0) // Placeholder for float32
+	}
+	if len(fields) > 3 {
+		rec.SetSDontCare(fields[3])
+	}
+
+	return rec, nil
 }
