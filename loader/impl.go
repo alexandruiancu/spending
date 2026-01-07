@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"log"
 
+	"spending/bldrec"
 	"spending/common"
 
+	capnp "capnproto.org/go/capnp/v3"
 	zmq "github.com/pebbe/zmq4"
 )
 
@@ -28,13 +30,27 @@ func StartLoadBalancer() {
 }
 
 func startWorker(id int) {
-	socket, _ := zmq.NewSocket(zmq.REQ)
+	socket, _ := zmq.NewSocket(zmq.REP)
 	defer socket.Close()
 	socket.Connect("tcp://localhost:5556")
 
 	for {
-		msg, _ := socket.Recv(0)
-		log.Printf("Worker %d received: %s\n", id, msg)
-		socket.Send(fmt.Sprintf("Reply from worker %d", id), 0)
+		zmqMsgBytes, _ := socket.RecvBytes(0)
+		// Wrap in a Cap’n Proto message (read‑only)
+		msg, err := capnp.Unmarshal(zmqMsgBytes)
+		if err != nil {
+			log.Fatalf("capnp message: %v", err)
+		}
+		record, err := bldrec.ReadRootRecord(msg)
+		if err != nil {
+			log.Fatalf("read struct: %v", err)
+		}
+		desc, _ := record.SDescription()
+		tmp, err := fmt.Printf("Worker %d received: %s\n", id, desc)
+		if err != nil {
+			continue
+		}
+		//println(desc)
+		socket.Send(fmt.Sprintf("Reply from worker %d", tmp), 0)
 	}
 }
