@@ -9,6 +9,8 @@ import (
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
 	"go.opentelemetry.io/otel/metric"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
+	resource "go.opentelemetry.io/otel/sdk/resource"
+	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -22,13 +24,9 @@ import (
 
 var glblMeterProvider *sdkmetric.MeterProvider
 
-// Initialize a gRPC connection to be used by both the tracer and meter
-// providers.
 func initConn() (*grpc.ClientConn, error) {
-	// It connects the OpenTelemetry Collector through local gRPC connection.
-	// You may replace `localhost:4317` with your endpoint.
 	conn, err := grpc.NewClient("localhost:4317",
-		// Note the use of insecure transport here. TLS is recommended in production.
+		// Note the use of insecure transport here.
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
@@ -38,30 +36,58 @@ func initConn() (*grpc.ClientConn, error) {
 	return conn, err
 }
 
+func createDebitView() sdkmetric.View {
+	// ---- provide view instead of instrument --------------------------------
+	debitView := sdkmetric.NewView(
+		sdkmetric.Instrument{
+			Kind:        sdkmetric.InstrumentKindHistogram,
+			Name:        "op.debit",
+			Unit:        "ron",
+			Description: "bank account debit in currency RON",
+		},
+		sdkmetric.Stream{
+			Aggregation: sdkmetric.AggregationExplicitBucketHistogram{
+				Boundaries: []float64{10, 50, 100, 500, 1000, 5000, 10000},
+			},
+		},
+	)
+	return debitView
+}
+
+func createResource(ctx context.Context) *resource.Resource {
+	return resource.NewWithAttributes(
+		semconv.SchemaURL,
+		semconv.ServiceName("spending-loader"),
+		semconv.ServiceVersion("0.1.0"),
+	)
+
+}
+
 func CreateMetricsPipeline(ctx context.Context) error {
 
-	comm, err := initConn()
+	conn, err := initConn()
 	if err != nil {
 		log.Fatalf("failed to initialize gRPC connection: %v", err)
 
 		return nil
 	}
-	// ---- OTLP gRPC exporter -------------------------------------------------
-	// Adjust the endpoint as needed (default: localhost:4317)
-	otlpExp, err := otlpmetricgrpc.New(ctx, otlpmetricgrpc.WithGRPCConn(comm))
+	// ---- OTLP gRPC exporter ------------------------------------------------
+	otlpExp, err := otlpmetricgrpc.New(ctx, otlpmetricgrpc.WithGRPCConn(conn))
 	if err != nil {
 		log.Fatalf("failed to create OTLP exporter: %v", err)
 
 		return nil
 	}
 
-	glblMeterProvider = sdkmetric.NewMeterProvider(sdkmetric.WithReader(sdkmetric.NewPeriodicReader(otlpExp)))
+	glblMeterProvider = sdkmetric.NewMeterProvider(
+		sdkmetric.WithReader(sdkmetric.NewPeriodicReader(otlpExp)),
+		sdkmetric.WithResource(createResource(ctx)),
+		sdkmetric.WithView(createDebitView()))
 	otel.SetMeterProvider(glblMeterProvider)
 	return nil
 }
 
 func CreateDebitInstrument() metric.Float64Histogram {
-
 	// ---- Create the histogram instrument ------------------------------------
 	meter := glblMeterProvider.Meter("spending/loader")
 	hist, err := meter.Float64Histogram(
@@ -72,7 +98,6 @@ func CreateDebitInstrument() metric.Float64Histogram {
 	if err != nil {
 		log.Fatalf("failed to create histogram: %v", err)
 	}
-
 	return hist
 }
 
