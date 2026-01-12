@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"spending/common"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -166,7 +167,12 @@ func createRecord(fields []string) (Record, error) {
 		rec.SetSDescription(fields[1])
 	}
 	if len(fields) > 2 {
-		rec.SetFValue(0.0) // Placeholder for float32
+		amount := strings.ReplaceAll(fields[2], ",", ".")
+		f, err := strconv.ParseFloat(amount, 32)
+		if err != nil {
+			f = 0.0
+		}
+		rec.SetFValue(float32(f))
 	}
 	if len(fields) > 3 {
 		rec.SetSDontCare(fields[3])
