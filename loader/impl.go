@@ -22,7 +22,9 @@ import (
 	zmq "github.com/pebbe/zmq4"
 )
 
+var glblContext context.Context
 var glblMeterProvider *sdkmetric.MeterProvider
+var glblInstruments map[string]any
 
 func initConn() (*grpc.ClientConn, error) {
 	conn, err := grpc.NewClient("localhost:4317",
@@ -41,7 +43,7 @@ func createDebitView() sdkmetric.View {
 	debitView := sdkmetric.NewView(
 		sdkmetric.Instrument{
 			Kind:        sdkmetric.InstrumentKindHistogram,
-			Name:        "op.debit",
+			Name:        "debit-histogram",
 			Unit:        "ron",
 			Description: "bank account debit in currency RON",
 		},
@@ -54,7 +56,7 @@ func createDebitView() sdkmetric.View {
 	return debitView
 }
 
-func createResource(ctx context.Context) *resource.Resource {
+func createResource() *resource.Resource {
 	return resource.NewWithAttributes(
 		semconv.SchemaURL,
 		semconv.ServiceName("spending-loader"),
@@ -67,38 +69,39 @@ func CreateMetricsPipeline(ctx context.Context) error {
 
 	conn, err := initConn()
 	if err != nil {
-		log.Fatalf("failed to initialize gRPC connection: %v", err)
-
-		return nil
+		return err
 	}
 	// ---- OTLP gRPC exporter ------------------------------------------------
-	otlpExp, err := otlpmetricgrpc.New(ctx, otlpmetricgrpc.WithGRPCConn(conn))
+	grpcMetricExporter, err := otlpmetricgrpc.New(ctx, otlpmetricgrpc.WithGRPCConn(conn))
 	if err != nil {
-		log.Fatalf("failed to create OTLP exporter: %v", err)
-
-		return nil
+		return err
 	}
 
 	glblMeterProvider = sdkmetric.NewMeterProvider(
-		sdkmetric.WithReader(sdkmetric.NewPeriodicReader(otlpExp)),
-		sdkmetric.WithResource(createResource(ctx)),
+		sdkmetric.WithReader(sdkmetric.NewPeriodicReader(grpcMetricExporter)),
+		sdkmetric.WithResource(createResource()),
 		sdkmetric.WithView(createDebitView()))
 	otel.SetMeterProvider(glblMeterProvider)
+	glblContext = ctx
+
 	return nil
 }
 
-func CreateDebitInstrument() metric.Float64Histogram {
+func CreateDebitInstrument() error {
 	// ---- Create the histogram instrument ------------------------------------
-	meter := glblMeterProvider.Meter("spending/loader")
+	meter := glblMeterProvider.Meter("debit-histogram")
 	hist, err := meter.Float64Histogram(
-		"op.debit",
+		"debit-histogram",
 		metric.WithUnit("ron"),
 		metric.WithDescription("bank account debit in currency RON"),
 	)
 	if err != nil {
 		log.Fatalf("failed to create histogram: %v", err)
 	}
-	return hist
+	glblInstruments = make(map[string]any)
+	glblInstruments["debit-histogram"] = hist
+
+	return nil
 }
 
 func ShutdownMetric(ctx context.Context) {
@@ -147,6 +150,7 @@ func startWorker(id int) {
 			continue
 		}
 		//println(desc)
+		glblInstruments["debit-histogram"].(metric.Float64Histogram).Record(glblContext, float64(record.FValue()))
 		socket.Send(fmt.Sprintf("Reply from worker %d", tmp), 0)
 	}
 }
