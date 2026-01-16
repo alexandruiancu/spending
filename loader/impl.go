@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
+	"go.opentelemetry.io/otel/exporters/stdout/stdoutmetric"
 	"go.opentelemetry.io/otel/metric"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	resource "go.opentelemetry.io/otel/sdk/resource"
@@ -76,9 +78,16 @@ func CreateMetricsPipeline(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	// ---- OTLP console  (debug) exporter ------------------------------------------------
+	consoleMetricExporter, err := stdoutmetric.New(stdoutmetric.WithWriter(os.Stdout),
+		stdoutmetric.WithPrettyPrint())
+	if err != nil {
+		return err
+	}
 
 	glblMeterProvider = sdkmetric.NewMeterProvider(
 		sdkmetric.WithReader(sdkmetric.NewPeriodicReader(grpcMetricExporter)),
+		sdkmetric.WithReader(sdkmetric.NewPeriodicReader(consoleMetricExporter)),
 		sdkmetric.WithResource(createResource()),
 		sdkmetric.WithView(createDebitView()))
 	otel.SetMeterProvider(glblMeterProvider)
