@@ -17,8 +17,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"spending/bldrec"
-	"spending/common"
+	"me/bldrec"
 
 	capnp "capnproto.org/go/capnp/v3"
 	zmq "github.com/pebbe/zmq4"
@@ -119,11 +118,10 @@ func ShutdownMetric(ctx context.Context) {
 	}
 }
 
-func StartLoadBalancer() {
+func StartLoadBalancer(config map[string]string) {
 	frontend, _ := zmq.NewSocket(zmq.ROUTER)
 	defer frontend.Close()
 
-	config := common.ReadConfig("../config.txt")
 	port := config["frontend_port"]
 	frontend.Bind(fmt.Sprintf("tcp://localhost:%s", port))
 

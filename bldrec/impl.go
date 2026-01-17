@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"spending/common"
 	"strconv"
 	"strings"
 	"sync"
@@ -17,31 +16,31 @@ import (
 	zmq "github.com/pebbe/zmq4"
 )
 
-func Process() error {
-	config := common.ReadConfig("../config.txt")
-
+func Process(config map[string]string) error {
 	inDir := config["in_dir"]
 	historyDir := config["history_dir"]
 
-	records, err := ProcessFiles(inDir, historyDir)
-	if err != nil {
-		return err
-	}
-
-	port := config["frontend_port"]
-	for _, record := range records {
-		socket, _ := zmq.NewSocket(zmq.REQ)
-		defer socket.Close()
-		socket.Connect(fmt.Sprintf("tcp://localhost:%s", port))
-		// Serialize to a byte slice
-		data, err := record.Message().Marshal()
+	for true {
+		records, err := ProcessFiles(inDir, historyDir)
 		if err != nil {
-			log.Fatalf("marshal: %v", err)
+			return err
 		}
-		socket.SendBytes(data, 0)
-		// Receive reply
-		reply, _ := socket.Recv(0)
-		fmt.Printf("Received reply: %s\n", reply)
+
+		port := config["frontend_port"]
+		for _, record := range records {
+			socket, _ := zmq.NewSocket(zmq.REQ)
+			defer socket.Close()
+			socket.Connect(fmt.Sprintf("tcp://localhost:%s", port))
+			// Serialize to a byte slice
+			data, err := record.Message().Marshal()
+			if err != nil {
+				log.Fatalf("marshal: %v", err)
+			}
+			socket.SendBytes(data, 0)
+			// Receive reply
+			reply, _ := socket.Recv(0)
+			fmt.Printf("Received reply: %s\n", reply)
+		}
 	}
 
 	return nil

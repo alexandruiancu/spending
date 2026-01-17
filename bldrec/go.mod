@@ -1,12 +1,12 @@
-module spending/bldrec
+module me/bldrec
 
 go 1.25.5
 
-replace spending/common => ../common
+replace me/common => ../common
 
 require (
 	capnproto.org/go/capnp/v3 v3.1.0-alpha.2
-	spending/common v0.0.0-00010101000000-000000000000
+	me/common v0.0.0-00010101000000-000000000000
 )
 
 require (

@@ -1,12 +1,11 @@
 go 1.25.5
 
-replace spending/bldrec => ../bldrec
+replace me/bldrec => ../bldrec
 
 require (
-	spending/bldrec v0.0.0-00010101000000-000000000000
-	spending/loader v0.0.0-00010101000000-000000000000
+	me/bldrec v0.0.0-00010101000000-000000000000
+	me/loader v0.0.0-00010101000000-000000000000
 )
-
 require (
 	capnproto.org/go/capnp/v3 v3.1.0-alpha.2 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
@@ -20,6 +19,7 @@ require (
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel v1.39.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.39.0 // indirect
+	go.opentelemetry.io/otel/exporters/stdout/stdoutmetric v1.39.0 // indirect
 	go.opentelemetry.io/otel/metric v1.39.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.39.0 // indirect
 	go.opentelemetry.io/otel/sdk/metric v1.39.0 // indirect
@@ -33,11 +33,11 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20251202230838-ff82c1b0f217 // indirect
 	google.golang.org/grpc v1.78.0 // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
-	spending/common v0.0.0-00010101000000-000000000000 // indirect
+	me/common v0.0.0-00010101000000-000000000000 // indirect
 )
 
-replace spending/common => ../common
+replace me/common => ../common
 
-replace spending/loader => ../loader
+replace me/loader => ../loader
 
-module spending/driver
+module me/driver
