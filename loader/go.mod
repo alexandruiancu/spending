@@ -13,8 +13,8 @@ require (
 	go.opentelemetry.io/otel/sdk/metric v1.39.0
 	google.golang.org/grpc v1.78.0
 	me/bldrec v0.0.0-00010101000000-000000000000
-	me/common v0.0.0-00010101000000-000000000000
 )
+
 require (
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect

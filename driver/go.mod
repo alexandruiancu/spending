@@ -4,8 +4,10 @@ replace me/bldrec => ../bldrec
 
 require (
 	me/bldrec v0.0.0-00010101000000-000000000000
+	me/common v0.0.0-00010101000000-000000000000
 	me/loader v0.0.0-00010101000000-000000000000
 )
+
 require (
 	capnproto.org/go/capnp/v3 v3.1.0-alpha.2 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
@@ -33,7 +35,6 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20251202230838-ff82c1b0f217 // indirect
 	google.golang.org/grpc v1.78.0 // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
-	me/common v0.0.0-00010101000000-000000000000 // indirect
 )
 
 replace me/common => ../common
